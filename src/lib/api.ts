@@ -157,6 +157,12 @@ export type Reservation = {
   ends_at: string;
   status: string;
   amount: string;
+  reject_reason?: string | null;
+};
+
+export type ReservationAdmin = Reservation & {
+  resident_name: string;
+  common_area_name: string;
 };
 
 export type Announcement = {
@@ -302,7 +308,31 @@ export const api = {
       throw new Error(typeof body?.detail === "string" ? body.detail : response.statusText);
     }
   },
-  reservations: () => request<Reservation[]>("/admin/reservations"),
+  reservations: (params?: {
+    from_date?: string;
+    to_date?: string;
+    common_area_id?: string;
+    resident_id?: string;
+    status?: string;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.from_date) qs.set("from_date", params.from_date);
+    if (params?.to_date) qs.set("to_date", params.to_date);
+    if (params?.common_area_id) qs.set("common_area_id", params.common_area_id);
+    if (params?.resident_id) qs.set("resident_id", params.resident_id);
+    if (params?.status) qs.set("status", params.status);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<ReservationAdmin[]>(`/admin/reservations${suffix}`);
+  },
+  approveReservation: (id: string) =>
+    request<ReservationAdmin>(`/admin/reservations/${id}/approve`, { method: "POST" }),
+  rejectReservation: (id: string, reason = "") =>
+    request<ReservationAdmin>(`/admin/reservations/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+  cancelReservationAdmin: (id: string) =>
+    request<ReservationAdmin>(`/admin/reservations/${id}/cancel`, { method: "POST" }),
 
   // Announcements
   announcements: () => request<Announcement[]>("/announcements"),
