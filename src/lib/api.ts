@@ -141,12 +141,23 @@ export type BlackoutOut = {
   note: string;
 };
 
+export type SpecialHoursOut = {
+  id: string;
+  common_area_id: string;
+  on_date: string;
+  open_time?: string | null;
+  close_time?: string | null;
+  is_closed: boolean;
+  note: string;
+};
+
 export type ImageOut = { id: string; url: string; sort_order: number };
 
 export type CommonAreaDetail = CommonArea & {
   schedules: ScheduleOut[];
   blackouts: BlackoutOut[];
   images: ImageOut[];
+  special_hours: SpecialHoursOut[];
 };
 
 export type Reservation = {
@@ -158,6 +169,7 @@ export type Reservation = {
   status: string;
   amount: string;
   reject_reason?: string | null;
+  receipt_number?: string | null;
 };
 
 export type ReservationAdmin = Reservation & {
@@ -308,6 +320,35 @@ export const api = {
       throw new Error(typeof body?.detail === "string" ? body.detail : response.statusText);
     }
   },
+  createSpecialHours: (
+    id: string,
+    payload: {
+      on_date: string;
+      open_time?: string | null;
+      close_time?: string | null;
+      is_closed: boolean;
+      note?: string;
+    },
+  ) =>
+    request<SpecialHoursOut>(`/admin/common-areas/${id}/special-hours`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  deleteSpecialHours: async (areaId: string, specialId: string) => {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const token = localStorage.getItem("auth-store")
+      ? JSON.parse(localStorage.getItem("auth-store") as string).state?.token
+      : null;
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const response = await fetch(`${API_BASE_URL}/admin/common-areas/${areaId}/special-hours/${specialId}`, {
+      method: "DELETE",
+      headers,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(typeof body?.detail === "string" ? body.detail : response.statusText);
+    }
+  },
   reservations: (params?: {
     from_date?: string;
     to_date?: string;
@@ -324,6 +365,32 @@ export const api = {
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<ReservationAdmin[]>(`/admin/reservations${suffix}`);
   },
+  exportReservationsCsv: async (params?: {
+    from_date?: string;
+    to_date?: string;
+    common_area_id?: string;
+    status?: string;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.from_date) qs.set("from_date", params.from_date);
+    if (params?.to_date) qs.set("to_date", params.to_date);
+    if (params?.common_area_id) qs.set("common_area_id", params.common_area_id);
+    if (params?.status) qs.set("status", params.status);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const headers = new Headers();
+    const token = localStorage.getItem("auth-store")
+      ? JSON.parse(localStorage.getItem("auth-store") as string).state?.token
+      : null;
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const response = await fetch(`${API_BASE_URL}/admin/reservations/export${suffix}`, { headers });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(typeof body?.detail === "string" ? body.detail : response.statusText);
+    }
+    return response.blob();
+  },
+  runReservationsMaintenance: () =>
+    request<{ completed: number; expired: number }>("/admin/jobs/reservations-maintenance", { method: "POST" }),
   approveReservation: (id: string) =>
     request<ReservationAdmin>(`/admin/reservations/${id}/approve`, { method: "POST" }),
   rejectReservation: (id: string, reason = "") =>

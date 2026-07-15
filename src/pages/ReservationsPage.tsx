@@ -10,10 +10,11 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelada",
   rescheduled: "Reprogramada",
   rejected: "Rechazada",
+  completed: "Completada",
 };
 
 function statusClass(status: string): string {
-  if (status === "approved" || status === "paid") return "ok";
+  if (status === "approved" || status === "paid" || status === "completed") return "ok";
   if (status === "rejected" || status === "cancelled") return "danger";
   return "warn";
 }
@@ -105,6 +106,44 @@ export function ReservationsPage() {
     }
   }
 
+  async function exportCsv() {
+    setBusy(true);
+    setError("");
+    try {
+      const blob = await api.exportReservationsCsv({
+        from_date: filters.from_date || undefined,
+        to_date: filters.to_date || undefined,
+        common_area_id: filters.common_area_id || undefined,
+        status: filters.status || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "reservas.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+      setMessage("CSV exportado.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo exportar");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runMaintenance() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api.runReservationsMaintenance();
+      setMessage(`Mantenimiento: ${result.completed} completadas, ${result.expired} vencidas.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo ejecutar el job");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <AdminLayout>
       <div className="section-header">
@@ -114,9 +153,17 @@ export function ReservationsPage() {
             Gestión de reservas de zonas sociales · {pendingCount} pendientes de aprobación
           </p>
         </div>
-        <button type="button" className="btn-secondary" onClick={() => void load()}>
-          Actualizar
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" className="btn-secondary" disabled={busy} onClick={() => void exportCsv()}>
+            Exportar CSV
+          </button>
+          <button type="button" className="btn-secondary" disabled={busy} onClick={() => void runMaintenance()}>
+            Finalizar vencidas
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => void load()}>
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {message ? <div className="admin-notice">{message}</div> : null}
@@ -188,6 +235,7 @@ export function ReservationsPage() {
                 <th>Inicio</th>
                 <th>Fin</th>
                 <th>Monto</th>
+                <th>Comprobante</th>
                 <th>Estado</th>
                 <th />
               </tr>
@@ -200,6 +248,7 @@ export function ReservationsPage() {
                   <td>{new Date(r.starts_at).toLocaleString("es-CO")}</td>
                   <td>{new Date(r.ends_at).toLocaleString("es-CO")}</td>
                   <td>{money(r.amount)}</td>
+                  <td>{r.receipt_number || "—"}</td>
                   <td>
                     <span className={`pill ${statusClass(r.status)}`}>{STATUS_LABELS[r.status] ?? r.status}</span>
                     {r.reject_reason ? <small>{r.reject_reason}</small> : null}
@@ -215,7 +264,7 @@ export function ReservationsPage() {
                         </button>
                       </>
                     ) : null}{" "}
-                    {r.status !== "cancelled" && r.status !== "rejected" ? (
+                    {r.status !== "cancelled" && r.status !== "rejected" && r.status !== "completed" ? (
                       <button type="button" className="btn-secondary" disabled={busy} onClick={() => void cancel(r.id)}>
                         Cancelar
                       </button>

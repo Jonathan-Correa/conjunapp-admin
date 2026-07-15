@@ -57,6 +57,14 @@ export function CommonAreasPage() {
     ends_at: "",
     note: "",
   });
+  const [docsText, setDocsText] = useState("");
+  const [special, setSpecial] = useState({
+    on_date: "",
+    open_time: "08:00",
+    close_time: "18:00",
+    is_closed: false,
+    note: "",
+  });
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -107,6 +115,7 @@ export function CommonAreasPage() {
   function startCreate() {
     setEditingId(null);
     setForm(emptyForm);
+    setDocsText("");
     setShowForm(true);
     setSelected(null);
   }
@@ -132,6 +141,7 @@ export function CommonAreasPage() {
       max_active_per_resident: area.max_active_per_resident,
       required_documents: area.required_documents ?? [],
     });
+    setDocsText((area.required_documents ?? []).join("\n"));
     setShowForm(true);
     void openDetail(area.id);
   }
@@ -142,8 +152,13 @@ export function CommonAreasPage() {
     setMessage("");
     setError("");
     try {
+      const docs = docsText
+        .split("\n")
+        .map((d) => d.trim())
+        .filter(Boolean);
       const payload = {
         ...form,
+        required_documents: docs,
         has_cost: form.has_cost || form.hourly_rate > 0,
       };
       if (editingId) {
@@ -249,6 +264,43 @@ export function CommonAreasPage() {
     }
   }
 
+  async function addSpecialHours(e: FormEvent) {
+    e.preventDefault();
+    if (!selected) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.createSpecialHours(selected.id, {
+        on_date: special.on_date,
+        open_time: special.is_closed ? null : special.open_time,
+        close_time: special.is_closed ? null : special.close_time,
+        is_closed: special.is_closed,
+        note: special.note,
+      });
+      setSpecial({ on_date: "", open_time: "08:00", close_time: "18:00", is_closed: false, note: "" });
+      setMessage("Horario especial guardado.");
+      await openDetail(selected.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar el horario especial");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeSpecial(id: string) {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      await api.deleteSpecialHours(selected.id, id);
+      setMessage("Horario especial eliminado.");
+      await openDetail(selected.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo eliminar");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <AdminLayout>
       <div className="section-header">
@@ -315,6 +367,15 @@ export function CommonAreasPage() {
             <label className="span-2">
               Reglamento
               <textarea rows={3} value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} />
+            </label>
+            <label className="span-2">
+              Documentos requeridos (uno por línea)
+              <textarea
+                rows={3}
+                value={docsText}
+                onChange={(e) => setDocsText(e.target.value)}
+                placeholder={"Cédula\nPaz y salvo"}
+              />
             </label>
             <label className="inline-check">
               <input type="checkbox" checked={form.is_bookable} onChange={(e) => setForm({ ...form, is_bookable: e.target.checked })} />
@@ -492,6 +553,68 @@ export function CommonAreasPage() {
                       </button>
                     </div>
                     {b.note ? <div className="panel-row__meta">{b.note}</div> : null}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <h3 style={{ marginTop: 24 }}>Horarios especiales</h3>
+            <form className="form-grid" onSubmit={addSpecialHours}>
+              <label>
+                Fecha
+                <input required type="date" value={special.on_date} onChange={(e) => setSpecial({ ...special, on_date: e.target.value })} />
+              </label>
+              <label className="inline-check">
+                <input
+                  type="checkbox"
+                  checked={special.is_closed}
+                  onChange={(e) => setSpecial({ ...special, is_closed: e.target.checked })}
+                />
+                Cerrado ese día
+              </label>
+              <label>
+                Apertura
+                <input
+                  type="time"
+                  disabled={special.is_closed}
+                  value={special.open_time}
+                  onChange={(e) => setSpecial({ ...special, open_time: e.target.value })}
+                />
+              </label>
+              <label>
+                Cierre
+                <input
+                  type="time"
+                  disabled={special.is_closed}
+                  value={special.close_time}
+                  onChange={(e) => setSpecial({ ...special, close_time: e.target.value })}
+                />
+              </label>
+              <label className="span-2">
+                Nota
+                <input value={special.note} onChange={(e) => setSpecial({ ...special, note: e.target.value })} />
+              </label>
+              <div className="form-actions span-2">
+                <button type="submit" className="btn-secondary" disabled={busy}>
+                  Guardar horario especial
+                </button>
+              </div>
+            </form>
+            <div className="panel-list" style={{ marginTop: 12 }}>
+              {(selected.special_hours ?? []).length === 0 ? (
+                <p className="empty">Sin horarios especiales.</p>
+              ) : (
+                (selected.special_hours ?? []).map((h) => (
+                  <div key={h.id} className="panel-row">
+                    <div className="panel-row__line">
+                      <span className="panel-row__title">
+                        {h.on_date}: {h.is_closed ? "Cerrado" : `${h.open_time} – ${h.close_time}`}
+                      </span>
+                      <button type="button" className="btn-secondary" onClick={() => void removeSpecial(h.id)}>
+                        Quitar
+                      </button>
+                    </div>
+                    {h.note ? <div className="panel-row__meta">{h.note}</div> : null}
                   </div>
                 ))
               )}
