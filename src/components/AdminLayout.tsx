@@ -1,11 +1,12 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Bell, Building2, CalendarDays, LayoutDashboard, LogOut, Receipt, Users } from "lucide-react";
+import { Bell, Building2, CalendarDays, LayoutDashboard, LogOut, MapPinned, Receipt, Users } from "lucide-react";
 import { useAuthStore } from "../store/auth";
 import type { ReactNode } from "react";
 
 const tabs = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/dashboard/residents", label: "Residentes", icon: Users },
+  { to: "/dashboard/common-areas", label: "Zonas Sociales", icon: MapPinned },
   { to: "/dashboard/invoices", label: "Facturas", icon: Receipt },
   { to: "/dashboard/reservations", label: "Reservas", icon: CalendarDays },
   { to: "/dashboard/announcements", label: "Anuncios", icon: Bell },

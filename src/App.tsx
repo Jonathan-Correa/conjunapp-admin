@@ -6,6 +6,7 @@ import { ResidentsPage } from "./pages/ResidentsPage";
 import { InvoicesPage } from "./pages/InvoicesPage";
 import { ReservationsPage } from "./pages/ReservationsPage";
 import { AnnouncementsPage } from "./pages/AnnouncementsPage";
+import { CommonAreasPage } from "./pages/CommonAreasPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 function App() {
@@ -27,6 +28,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ResidentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/common-areas"
+          element={
+            <ProtectedRoute>
+              <CommonAreasPage />
             </ProtectedRoute>
           }
         />

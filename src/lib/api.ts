@@ -85,11 +85,68 @@ export type Invoice = {
 export type CommonArea = {
   id: string;
   name: string;
+  category: string;
+  description: string;
   capacity: number;
   hourly_rate: string;
+  has_cost: boolean;
   requires_approval: boolean;
   rules: string;
   is_active: boolean;
+  is_bookable: boolean;
+  min_duration_minutes: number;
+  max_duration_minutes: number;
+  min_advance_minutes: number;
+  max_advance_days: number;
+  cleanup_buffer_minutes: number;
+  max_active_per_resident: number;
+  required_documents: string[];
+};
+
+export type CommonAreaPayload = {
+  name: string;
+  category: string;
+  description: string;
+  capacity: number;
+  hourly_rate: number;
+  has_cost: boolean;
+  requires_approval: boolean;
+  rules: string;
+  is_active: boolean;
+  is_bookable: boolean;
+  min_duration_minutes: number;
+  max_duration_minutes: number;
+  min_advance_minutes: number;
+  max_advance_days: number;
+  cleanup_buffer_minutes: number;
+  max_active_per_resident: number;
+  required_documents: string[];
+};
+
+export type ScheduleItem = {
+  weekday: number;
+  open_time?: string | null;
+  close_time?: string | null;
+  is_closed: boolean;
+};
+
+export type ScheduleOut = ScheduleItem & { id: string };
+
+export type BlackoutOut = {
+  id: string;
+  common_area_id: string;
+  reason_type: string;
+  starts_at: string;
+  ends_at: string;
+  note: string;
+};
+
+export type ImageOut = { id: string; url: string; sort_order: number };
+
+export type CommonAreaDetail = CommonArea & {
+  schedules: ScheduleOut[];
+  blackouts: BlackoutOut[];
+  images: ImageOut[];
 };
 
 export type Reservation = {
@@ -205,6 +262,46 @@ export const api = {
 
   // Common Areas & Reservations
   commonAreas: () => request<CommonArea[]>("/admin/common-areas"),
+  commonAreaDetail: (id: string) => request<CommonAreaDetail>(`/admin/common-areas/${id}`),
+  createCommonArea: (payload: CommonAreaPayload) =>
+    request<CommonArea>("/admin/common-areas", { method: "POST", body: JSON.stringify(payload) }),
+  updateCommonArea: (id: string, payload: Partial<CommonAreaPayload>) =>
+    request<CommonArea>(`/admin/common-areas/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deactivateCommonArea: (id: string) =>
+    request<CommonArea>(`/admin/common-areas/${id}`, { method: "DELETE" }),
+  replaceSchedules: (id: string, items: ScheduleItem[]) =>
+    request<CommonAreaDetail>(`/admin/common-areas/${id}/schedules`, {
+      method: "PUT",
+      body: JSON.stringify(items),
+    }),
+  replaceImages: (id: string, items: Array<{ url: string; sort_order: number }>) =>
+    request<CommonAreaDetail>(`/admin/common-areas/${id}/images`, {
+      method: "PUT",
+      body: JSON.stringify(items),
+    }),
+  createBlackout: (
+    id: string,
+    payload: { reason_type: string; starts_at: string; ends_at: string; note?: string },
+  ) =>
+    request<BlackoutOut>(`/admin/common-areas/${id}/blackouts`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  deleteBlackout: async (areaId: string, blackoutId: string) => {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const token = localStorage.getItem("auth-store")
+      ? JSON.parse(localStorage.getItem("auth-store") as string).state?.token
+      : null;
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const response = await fetch(`${API_BASE_URL}/admin/common-areas/${areaId}/blackouts/${blackoutId}`, {
+      method: "DELETE",
+      headers,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(typeof body?.detail === "string" ? body.detail : response.statusText);
+    }
+  },
   reservations: () => request<Reservation[]>("/admin/reservations"),
 
   // Announcements
