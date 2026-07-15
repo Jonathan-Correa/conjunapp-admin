@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BadgeCheck, Bell, Building2, CalendarDays, FileText, LayoutDashboard, LogOut, Receipt, Users } from "lucide-react";
 import { MetricCard } from "../components/MetricCard";
@@ -28,33 +28,44 @@ const initialData: DataState = {
   accounting: null,
 };
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "No se pudieron cargar los datos del dashboard.";
+}
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [data, setData] = useState<DataState>(initialData);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-  const today = new Date().toISOString().slice(0, 10);
-  const period = today.slice(0, 7);
+  const [error, setError] = useState("");
 
   async function load() {
     setLoading(true);
-    const [dashboard, residents, units, invoices, areas, reservations, announcements, accounting] = await Promise.all([
-      api.dashboard(),
-      api.residents(),
-      api.units(),
-      api.invoices(),
-      api.commonAreas(),
-      api.reservations(),
-      api.announcements(),
-      api.accountingReport(),
-    ]);
-    setData({ dashboard, residents, units, invoices, areas, reservations, announcements, accounting });
-    setLoading(false);
+    setError("");
+    try {
+      const [dashboard, residents, units, invoices, areas, reservations, announcements, accounting] = await Promise.all([
+        api.dashboard(),
+        api.residents(),
+        api.units(),
+        api.invoices(),
+        api.commonAreas(),
+        api.reservations(),
+        api.announcements(),
+        api.accountingReport(),
+      ]);
+      setData({ dashboard, residents, units, invoices, areas, reservations, announcements, accounting });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   const handleLogout = () => {
@@ -64,7 +75,6 @@ export function DashboardPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", backgroundColor: "#f4f7f2" }}>
-      {/* Header */}
       <header style={{ backgroundColor: "#176b5c", color: "white", padding: "16px 24px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", maxWidth: "1400px", margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -105,16 +115,28 @@ export function DashboardPage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main style={{ flex: 1, padding: "24px", maxWidth: "1400px", width: "100%", margin: "0 auto" }}>
-        {/* Message */}
-        {message && (
-          <div style={{ marginBottom: "20px", padding: "16px", backgroundColor: "#d4edda", borderRadius: "8px", color: "#155724" }}>
-            {message}
+        {error && (
+          <div
+            style={{
+              marginBottom: "20px",
+              padding: "16px",
+              backgroundColor: "#fdecea",
+              borderRadius: "8px",
+              color: "#611a15",
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "16px",
+              alignItems: "center",
+            }}
+          >
+            <span>{error}</span>
+            <button type="button" onClick={() => void load()}>
+              Reintentar
+            </button>
           </div>
         )}
 
-        {/* Navigation Tabs */}
         <div style={{ display: "flex", gap: "16px", marginBottom: "24px", borderBottom: "1px solid #ddd", paddingBottom: "12px" }}>
           <button style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderBottom: "3px solid #176b5c", backgroundColor: "transparent", border: "none", color: "#176b5c", fontWeight: "600", cursor: "pointer" }}>
             <LayoutDashboard size={18} />
@@ -138,35 +160,30 @@ export function DashboardPage() {
           </button>
         </div>
 
-        {/* Loading State */}
         {loading ? (
           <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
             <div style={{ display: "inline-block", width: "40px", height: "40px", border: "4px solid #ddd", borderTopColor: "#176b5c", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
             <p style={{ marginTop: "16px" }}>Cargando datos...</p>
           </div>
-        ) : (
+        ) : !error ? (
           <>
-            {/* Metrics */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", marginBottom: "32px" }}>
               <MetricCard
                 title="Unidades"
                 value={data.dashboard?.total_units ?? 0}
                 icon={<Building2 size={24} />}
-                trend={null}
                 color="#176b5c"
               />
               <MetricCard
                 title="Residentes"
                 value={data.dashboard?.total_residents ?? 0}
                 icon={<Users size={24} />}
-                trend={null}
                 color="#1a73e8"
               />
               <MetricCard
                 title="Facturado"
                 value={money(data.dashboard?.monthly_billed ?? 0)}
                 icon={<FileText size={24} />}
-                trend={null}
                 color="#34a853"
               />
               <MetricCard
@@ -176,19 +193,22 @@ export function DashboardPage() {
                 trend={data.dashboard?.monthly_collection_rate ? `${data.dashboard.monthly_collection_rate.toFixed(1)}%` : "0%"}
                 color="#0a9396"
               />
-              <MetricCard title="Morosos" value={money(data.dashboard?.overdue ?? 0)} icon={<Bell size={24} />} trend={data.dashboard?.delinquent_units ?? 0} color="#d32f2f" />
+              <MetricCard
+                title="Morosos"
+                value={money(data.dashboard?.overdue ?? 0)}
+                icon={<Bell size={24} />}
+                trend={`${data.dashboard?.delinquent_units ?? 0} unidades`}
+                color="#d32f2f"
+              />
               <MetricCard
                 title="Reservas"
                 value={data.dashboard?.active_reservations ?? 0}
                 icon={<CalendarDays size={24} />}
-                trend={null}
                 color="#f57c00"
               />
             </div>
 
-            {/* Tables Preview */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: "20px" }}>
-              {/* Recent Residents */}
               <div style={{ backgroundColor: "white", borderRadius: "8px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
                 <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: "600", color: "#333" }}>Residentes Recientes</h3>
                 <div style={{ maxHeight: "300px", overflowY: "auto" }}>
@@ -203,7 +223,6 @@ export function DashboardPage() {
                 </div>
               </div>
 
-              {/* Recent Invoices */}
               <div style={{ backgroundColor: "white", borderRadius: "8px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
                 <h3 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: "600", color: "#333" }}>Facturas Recientes</h3>
                 <div style={{ maxHeight: "300px", overflowY: "auto" }}>
@@ -222,7 +241,7 @@ export function DashboardPage() {
               </div>
             </div>
           </>
-        )}
+        ) : null}
       </main>
     </div>
   );

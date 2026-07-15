@@ -1,4 +1,6 @@
 node_modules
-*.lock
-*lock.json
 dist
+.env
+.env.local
+.DS_Store
+*.log
