@@ -115,8 +115,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const detail = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(detail.detail ?? "Error de API");
+    const body = await response.json().catch(() => ({ detail: response.statusText }));
+    const detail = body?.detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((item) => item?.msg ?? JSON.stringify(item)).join("; ")
+          : response.statusText;
+    throw new Error(message || "Error de API");
   }
 
   return response.json() as Promise<T>;
@@ -157,7 +164,7 @@ export const api = {
   units: () => request<Unit[]>("/admin/units"),
   
   // Invoices
-  invoices: () => request<Invoice[]>("/invoices"),
+  invoices: () => request<Invoice[]>("/admin/invoices"),
   generateInvoices: (period: string, issueDate: string, dueDate: string) =>
     request<Invoice[]>("/admin/invoices/generate", {
       method: "POST",
@@ -166,7 +173,7 @@ export const api = {
 
   // Common Areas & Reservations
   commonAreas: () => request<CommonArea[]>("/common-areas"),
-  reservations: () => request<Reservation[]>("/reservations"),
+  reservations: () => request<Reservation[]>("/admin/reservations"),
 
   // Announcements
   announcements: () => request<Announcement[]>("/announcements"),
