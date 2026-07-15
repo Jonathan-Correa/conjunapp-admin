@@ -35,6 +35,30 @@ export type Resident = {
   is_owner: boolean;
   is_delinquent: boolean;
   unit: string;
+  unit_id: string;
+};
+
+export type CreateResidentPayload = {
+  full_name: string;
+  email: string;
+  phone: string;
+  document_number: string;
+  resident_type: string;
+  is_owner: boolean;
+  tower_name: string;
+  unit_number: string;
+  administration_fee: number;
+  parking_slot?: string | null;
+  initial_password: string;
+};
+
+export type PeaceClearance = {
+  id: string;
+  unit_id: string;
+  certificate_number: string;
+  issued_at: string;
+  valid_until: string;
+  is_valid: boolean;
 };
 
 export type Unit = {
@@ -95,23 +119,20 @@ export type AccountingReport = {
 };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    ...(options?.headers ?? {}),
-  };
+  const headers = new Headers(options?.headers);
+  headers.set("Content-Type", "application/json");
 
-  // Add authorization header if token exists in localStorage
-  const token = localStorage.getItem("auth-store") 
-    ? JSON.parse(localStorage.getItem("auth-store") as string).state?.token 
+  const token = localStorage.getItem("auth-store")
+    ? JSON.parse(localStorage.getItem("auth-store") as string).state?.token
     : null;
-  
+
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers,
     ...options,
+    headers,
   });
 
   if (!response.ok) {
@@ -159,12 +180,23 @@ export const api = {
   
   // Residents
   residents: () => request<Resident[]>("/admin/residents"),
-  
+  createResident: (payload: CreateResidentPayload) =>
+    request<Resident>("/admin/residents", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   // Units
   units: () => request<Unit[]>("/admin/units"),
   
   // Invoices
-  invoices: () => request<Invoice[]>("/admin/invoices"),
+  invoices: (params?: { onlyOpen?: boolean; unitId?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.onlyOpen) qs.set("only_open", "true");
+    if (params?.unitId) qs.set("unit_id", params.unitId);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<Invoice[]>(`/admin/invoices${suffix}`);
+  },
   generateInvoices: (period: string, issueDate: string, dueDate: string) =>
     request<Invoice[]>("/admin/invoices/generate", {
       method: "POST",
@@ -188,7 +220,7 @@ export const api = {
   
   // Other
   issuePeaceClearance: (unitId: string) =>
-    request<{ certificate_number: string }>("/admin/peace-clearances/" + unitId, {
+    request<PeaceClearance>("/admin/peace-clearances/" + unitId, {
       method: "POST",
     }),
 };
