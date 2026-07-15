@@ -204,7 +204,7 @@ export const api = {
     }),
 
   // Common Areas & Reservations
-  commonAreas: () => request<CommonArea[]>("/common-areas"),
+  commonAreas: () => request<CommonArea[]>("/admin/common-areas"),
   reservations: () => request<Reservation[]>("/admin/reservations"),
 
   // Announcements
