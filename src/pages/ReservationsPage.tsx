@@ -236,6 +236,7 @@ export function ReservationsPage() {
                 <th>Fin</th>
                 <th>Monto</th>
                 <th>Comprobante</th>
+                <th>Pago / Acceso</th>
                 <th>Estado</th>
                 <th />
               </tr>
@@ -249,6 +250,13 @@ export function ReservationsPage() {
                   <td>{new Date(r.ends_at).toLocaleString("es-CO")}</td>
                   <td>{money(r.amount)}</td>
                   <td>{r.receipt_number || "—"}</td>
+                  <td>
+                    <small>
+                      {r.payment_reference ? `Ref: ${r.payment_reference}` : "Sin pago"}
+                      <br />
+                      {r.access_code ? `Acceso: ${r.access_code}` : "Sin pase"}
+                    </small>
+                  </td>
                   <td>
                     <span className={`pill ${statusClass(r.status)}`}>{STATUS_LABELS[r.status] ?? r.status}</span>
                     {r.reject_reason ? <small>{r.reject_reason}</small> : null}

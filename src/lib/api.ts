@@ -168,8 +168,10 @@ export type Reservation = {
   ends_at: string;
   status: string;
   amount: string;
+  payment_reference?: string | null;
   reject_reason?: string | null;
   receipt_number?: string | null;
+  access_code?: string | null;
 };
 
 export type ReservationAdmin = Reservation & {
